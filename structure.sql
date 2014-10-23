@@ -1,9 +1,15 @@
 CREATE TABLE "users" (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sponsor INTEGER NOT NULL DEFAULT (0),
 	name VARCHAR(60),
 	hash VARCHAR(40) UNIQUE,
-	balance FLOAT
+	balance FLOAT,
+    CONSTRAINT fk_id
+    FOREIGN KEY (sponsor) REFERENCES users(id)
 );
+
+-- Se sql update command
+-- http://stackoverflow.com/questions/13249936/add-a-column-to-a-table-with-a-default-value-equal-to-the-value-of-an-existing-c#comment18055395_13249936
 
 CREATE TABLE "products" (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,8 +20,9 @@ CREATE TABLE "products" (
 
 CREATE TABLE "log" (
 	dt VARCHAR(23),
-	uid INTEGER,
-	oid INTEGER,
+	uid INTEGER, --user-id
+    sid INTEGER, --sponsor-id
+	oid INTEGER, --object-id
 	count INTEGER,
 	amount FLOAT
 );
@@ -26,11 +33,13 @@ CREATE TABLE "log" (
 -- COALESCE(NULL, NULL, NULL, 1, 2, 3)
 -- => 1
 CREATE VIEW "full_log" AS SELECT
-		dt, uid, oid,
+		dt, uid, sid, oid,
 		users.name AS uname,
+        sponsor.name AS sname,
 		coalesce(object.name,products.name,'<deleted>') AS oname,
 		count, amount
 	FROM log
 		LEFT JOIN users ON uid = users.id
 		LEFT JOIN products ON count NOT NULL AND oid = products.id
-		LEFT JOIN users AS object ON count IS NULL AND oid = object.id;
+		LEFT JOIN users AS object ON count IS NULL AND oid = object.id
+        LEFT JOIN users AS sponsor ON sid = sponsor.id;

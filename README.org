@@ -1,0 +1,30 @@
+# -*- coding: utf-8 -*-
+
+
+** Barcode scanner
+Zebex Z-6070
+[[http://www.zebex.com/Product/documents/ProgrammingGuide_Omnidirectional.pdf][Programming guide]]
+[[http://www.zebex.com/Product/documents/Z-6070/Z-6070_UsersManual_100915.pdf][User manual]]
+
+** Create database
+
+Install SQLite3
+#+BEGIN_SRC sh
+sudo apt-get install sqlite3 libsqlite3-dev
+#+END_SRC
+
+and create database
+
+#+BEGIN_SRC sh
+sqlite3 /home/paw/tmp/micropay.db < structure.sql
+#+END_SRC 
+
+** Use RPi
+http://www.instructables.com/id/How-to-Make-a-Raspberry-Pi-Media-Panel-fka-Digita/
+
+See also [[http://www.instructables.com/id/How-to-Make-a-Raspberry-Pi-Media-Panel-fka-Digita/?comments%3Dall#CT2V250I12KJ7WY][this]] comment.
+* TODO
+** Login with number
+** Create child accounts
+Create users which are owned by a master.
+These accounts can buy, but the master is paying.

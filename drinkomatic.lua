@@ -53,13 +53,18 @@ local function main_menu()
 	print ""
 	print "  1  | Create new account."
 	print "  2  | Update or create new product."
+	print "  3  | Show list of users."
 	print "  .  | Print this menu."
 	print "-------------------------------------------"
 
 	local r = assert(db:fetchone(
 		"SELECT SUM(balance)/COUNT(1), MIN(balance) FROM users"))
-	print(" Average balance:     %16.2f DKK", r[1])
-	print(" Largest single debt: %16.2f DKK", r[2])
+    if next(r) == nil then
+       print(" No users in database")
+    else
+       print(" Average balance:     %16.2f DKK", r[1])
+       print(" Largest single debt: %16.2f DKK", r[2])
+    end
 end
 
 local function user_menu()
@@ -73,7 +78,8 @@ local function user_menu()
 	print "  +  | Add money to account."
 	print "  -  | Transfer money."
 	print " <n> | Buy <n> items."
-	print "  .  | Print this menu."
+--	print "  .  | Print this menu."
+	print "  .  | Change payer."
 	print "-------------------------------------------"
 end
 
@@ -85,7 +91,7 @@ end
 
 local function login(hash, id)
 	local r = assert(db:fetchone("\z
-		SELECT id, name, balance \z
+		SELECT id, sponsor, name, balance \z
 		FROM users \z
 		WHERE hash = ?", hash))
 
@@ -102,13 +108,13 @@ local function login(hash, id)
 
 	clearscreen()
 	print("-------------------------------------------")
-	print(" Logged in as : %s", r[2])
-	print(" Balance      : %.2f DKK", r[3])
+	print(" Logged in as : %s", r[3])
+	print(" Balance      : %.2f DKK", r[4])
 	print("")
 	print(" NB. If your name is just numbers,")
-	print("     please tell Esmil to change it.")
+	print("     please tell Paw to change it.")
 	user_menu()
-	return 'USER', r[1]
+	return 'USER', r[1], r[2]
 end
 
 local function product_dump(p)
@@ -148,6 +154,10 @@ MAIN = {
 		['2'] = function()
 			print(" Scan barcode (or press enter to abort):")
 			return 'PROD_CODE'
+		end,
+		['3'] = function()
+			print(" List of users (press enter):")
+			return 'USER_LIST', 0
 		end,
 		['.'] = function()
 			main_menu()
@@ -210,6 +220,16 @@ NEWUSER_HASH = {
 
 		if not ok then
 			print(" Error creating account: %s", err)
+			return 'MAIN'
+		end
+
+        -- set payer to the created user ID.
+        local r = assert(db:fetchone(
+		"SELECT id FROM users WHERE hash = ?", hash))
+		local ok, err = db:fetchone(
+			"UPDATE users SET sponsor = ? WHERE id = ?", r[1], r[1])
+		if not ok then
+			print(" Error setting sponsor: %s", err)
 			return 'MAIN'
 		end
 
@@ -389,7 +409,7 @@ USER = {
 
 	card = login,
 
-	barcode = function(code, id, count)
+	barcode = function(code, id, sid, count)
 		local r = assert(db:fetchone("\z
 			SELECT id, name, price \z
 			FROM products \z
@@ -413,16 +433,16 @@ USER = {
 
 		assert(db:exec("\z
 			BEGIN; \z
-			UPDATE users SET balance = balance - @count * @amount WHERE id = @id; \z
-			INSERT INTO log (dt, uid, oid, count, amount) \z
-				VALUES (datetime('now'), @id, @oid, @count, @amount); \z
-			COMMIT", { id = id, oid = pid, count = count, amount = price }))
+			UPDATE users SET balance = balance - @count * @amount WHERE id = @sid; \z
+			INSERT INTO log (dt, uid, sid, oid, count, amount) \z
+				VALUES (datetime('now'), @id, @sid, @oid, @count, @amount); \z
+			COMMIT", { id = id, sid = sid, oid = pid, count = count, amount = price }))
 
 		r = assert(db:fetchone(
-			"SELECT balance FROM users WHERE id = ?", id))
-		print(" New balance: %.2f DKK", r[1])
+			"SELECT name, balance FROM users WHERE id = ?", sid))
+		print(" New balance for %s: %.2f DKK", r[1], r[2])
 
-		return 'USER', id
+		return 'USER', id, sid
 	end,
 
 	keyboard = {
@@ -430,7 +450,11 @@ USER = {
 			print " Swipe new card (or press enter to abort):"
 			return 'SWITCH_CARD', id
 		end,
-		['*'] = function(id)
+		['.'] = function(id)
+			print " Swipe new card (or press enter to abort):"
+			return 'SWITCH_PAYER', id, 0
+		end,
+		['*'] = function(id, sid)
 			local r = assert(db:fetchall("\z
 				SELECT substr(dt,6,11), \z
 					CASE \z
@@ -441,23 +465,25 @@ USER = {
 						ELSE 'Withdrawal' END, \z
 					CASE WHEN count NOT NULL THEN count \z
 						WHEN oid <> ?1 THEN 1 ELSE -1 END, \z
-					amount \z
+					amount, \z
+					Case WHEN sid <> uid THEN ' - bought by ' || uname \z
+						ELSE '' END \z
 				FROM full_log \z
-				WHERE uid = ?1 OR (count IS NULL AND oid = ?1) \z
+				WHERE uid = ?1 OR (sid = ?1) OR (count IS NULL AND oid = ?1) \z
 				ORDER BY dt DESC LIMIT 38", id))
 
 			for i = #r, 1, -1 do
 				local row = r[i]
 				if row[3] == 1 or row[3] == -1 then
 					print("%s %s   %8.2f DKK",
-						row[1], row[2]:utf8trim(36), -row[3]*row[4])
-				else
+						row[1], (row[2] .. row[5]):utf8trim(46), -row[3]*row[4])
+				else -- multiple items
 					print("%s %s %4d * %6.2f   %8.2f DKK",
-						row[1], row[2]:utf8trim(22), row[3], row[4], -row[3]*row[4])
+						row[1], (row[2] .. row[5]):utf8trim(32), row[3], row[4], -row[3]*row[4])
 				end
 			end
 
-			return 'USER', id
+			return 'USER', id, sid
 		end,
 		['+'] = function(id)
 			print " Enter amount (or press enter to abort):"
@@ -467,33 +493,71 @@ USER = {
 			print " Enter user id (or press enter for user list):"
 			return 'TRANSFER_LIST', id, 0
 		end,
+        --[[
 		['.'] = function(id)
 			user_menu()
 			return 'USER', id
 		end,
-		['n'] = function(id)
+        --]]
+		['n'] = function(id, sid)
 			print " Sigh. A number. That is [1-9][0-9]*"
-			return 'USER', id
+			return 'USER', id, sid
 		end,
-		[''] = function(id, count)
+		[''] = function(id, sid, count)
 			if count then
 				print " Aborted."
-				return 'USER', id
+				return 'USER', id, sid
 			end
 
 			return idle()
 		end,
-		function(cmd, id) --default
+		function(cmd, id, sid) --default
 			local count = tonumber(cmd)
 			if count then
 				print(" Buying %d of the next thing scanned. Press ENTER to abort.",
 					count)
-				return 'USER', id, count
+				return 'USER', id, sid, count
 			end
 
 			print(" Unknown command '%s'.", cmd)
 			user_menu()
-			return 'USER', id
+			return 'USER', id, sid
+		end,
+	},
+}
+
+USER_LIST = {
+	wait = timeout,
+	timeout = function()
+		print " Aborted due to inactivity."
+		return 'MAIN'
+	end,
+
+	card = login,
+
+	barcode = 'USER_LIST',
+
+	keyboard = {
+		[''] = function(offset)
+			local r = assert(db:fetchall(
+				"SELECT id, name, balance FROM users ORDER BY id LIMIT 39 OFFSET ?", offset))
+			local n = #r
+			if n == 0 then
+				print " Aborted."
+				return 'MAIN'
+			end
+
+			for i = 1, n < 39 and n or 38 do
+				local row = r[i]
+				print(" %4d) %s %8.2f DKK", row[1], row[2]:utf8trim(22), row[3])
+			end
+
+			if n < 39 then
+				print " Press enter to abort:"
+			else
+				print " Press enter to continue list:"
+			end
+			return 'USER_LIST', offset + 38
 		end,
 	},
 }
@@ -524,6 +588,61 @@ SWITCH_CARD = {
 		print " Aborted."
 		return 'USER', id
 	end,
+}
+
+SWITCH_PAYER = {
+	wait = timeout,
+	timeout = function(_, id)
+		print " Aborted due to inactivity."
+		return 'USER', id
+	end,
+
+	card = login,
+
+	barcode = 'SWITCH_PAYER',
+
+	keyboard = {
+		[''] = function(id, offset)
+			local r = assert(db:fetchall(
+				"SELECT id, name FROM users ORDER BY id LIMIT 39 OFFSET ?", offset))
+			local n = #r
+			if n == 0 then
+				print " Aborted."
+				return 'USER', id
+			end
+
+			for i = 1, n < 39 and n or 38 do
+				local row = r[i]
+				print(" %4d) %s", row[1], row[2])
+			end
+
+			if n < 39 then
+				print " Enter user id (or press enter to abort):"
+			else
+				print " Enter user id (or press enter to continue list):"
+			end
+			return 'SWITCH_PAYER', id, offset + 38
+		end,
+		function(cmd, id) --default
+			local n = tonumber(cmd)
+			if not n then
+				print(" Unable to parse '%s', aborted.", cmd)
+				return 'USER', id
+			end
+
+			local r = assert(db:fetchone(
+				"SELECT name FROM users WHERE id = ?", n))
+			if r == true then
+				print(" No such user. Aborted.")
+				return 'USER', id
+			end
+
+			print(" Setting %s as payer:", r[1])
+			local ok, err = db:fetchone(
+				"UPDATE users SET sponsor = ? WHERE id = ?", n, id)
+			return 'USER', id
+		end,
+	},
 }
 
 DEPOSIT = {
@@ -557,8 +676,8 @@ DEPOSIT = {
 			assert(db:exec("\z
 				BEGIN; \z
 				UPDATE users SET balance = balance + @amount WHERE id = @id; \z
-				INSERT INTO log (dt, uid, oid, count, amount) \z
-					VALUES (datetime('now'), @id, @id, NULL, @amount); \z
+				INSERT INTO log (dt, uid, sid, oid, count, amount) \z
+					VALUES (datetime('now'), @id, NULL, @id, NULL, @amount); \z
 				COMMIT", { id = id, amount = n }))
 
 			local r = assert(db:fetchone(
@@ -655,8 +774,8 @@ TRANSFER_AMOUNT = {
 				BEGIN; \z
 				UPDATE users SET balance = balance - @amount WHERE id = @id; \z
 				UPDATE users SET balance = balance + @amount WHERE id = @oid; \z
-				INSERT INTO log (dt, uid, oid, count, amount) \z
-					VALUES (datetime('now'), @id, @oid, NULL, @amount); \z
+				INSERT INTO log (dt, uid, sid, oid, count, amount) \z
+					VALUES (datetime('now'), @id, NULL, @oid, NULL, @amount); \z
 				COMMIT", { id = id, oid = oid, amount = n }))
 
 			r = assert(db:fetchone(
@@ -724,7 +843,7 @@ local function run(...)
 	}
 
 	function handle_state(str, ...)
-       print(inspect{str,...})
+--       print(inspect{str,...})
 		local state = _ENV[str]
 		if not state then
 			error(format("%s: invalid state", tostring(str)))
