@@ -117,6 +117,36 @@ local function login(hash, id)
 	return 'USER', r[1], r[2]
 end
 
+local function keylogin(hash, id)
+	-- local ctx = sha1.new()
+    -- ctx:add(hash):hex()
+   	local r = assert(db:fetchone("\z
+		SELECT id, sponsor, name, balance \z
+		FROM users \z
+		WHERE keyhash = ?", hash))
+
+	if r == true then
+		if id then
+			clearscreen()
+			print " Unknown pin, logged out."
+			main_menu()
+		else
+			print " Unknown pin.."
+		end
+		return 'MAIN'
+	end
+
+	clearscreen()
+	print("-------------------------------------------")
+	print(" Logged in as : %s", r[3])
+	print(" Balance      : %.2f DKK", r[4])
+	print("")
+	print(" NB. If your name is just numbers,")
+	print("     please tell Paw to change it.")
+	user_menu()
+	return 'USER', r[1], r[2]
+end
+
 local function product_dump(p)
 	print("-------------------------------------------")
 	print(" Product : %s", p[1])
@@ -167,10 +197,15 @@ MAIN = {
 			print(" ENTAR!")
 			return 'MAIN'
 		end,
-		function(cmd) --default
-			print(" Unknown command '%s'.", cmd)
-			main_menu()
-			return 'MAIN'
+		function(cmd,id) --default
+           n = #cmd
+           if n == 4 then
+              return keylogin(cmd,id)
+           else
+              print(" Unknown command '%s'.", cmd)
+              main_menu()
+              return 'MAIN'
+            end
 		end,
 	},
 }
@@ -199,6 +234,8 @@ NEWUSER_NAME = {
 		end,
 		function(name) --default
 			print(" Hello %s! Please swipe your card..", name)
+            print(" .. Or enter a four digit password ..")
+            print(" Press enter to abort..")
 			return 'NEWUSER_HASH', name
 		end,
 	},
@@ -238,10 +275,43 @@ NEWUSER_HASH = {
 
 	barcode = 'NEWUSER_HASH',
 
-	keyboard = function()
-		print " Aborted."
-		return 'MAIN'
-	end,
+	keyboard = {
+		[''] = function()
+			print " Aborted."
+			return 'MAIN'
+		end,
+		function(hash, name) --default
+           if #hash ~= 4 then
+              print(" Pin not four-digit.")
+              return 'MAIN'
+           end
+           print " Key pressed, thank you! Creating account.."
+		-- local ctx = sha1.new()
+	    -- ctx:add(hash):add('\r'):hex()
+        -- print(inspect(ctx))
+		local ok, err = db:fetchone("\z
+			INSERT INTO users (name, keyhash, balance) \z
+			VALUES (?, ?, 0.0)", name, hash)
+
+		if not ok then
+			print(" Error creating account: %s", err)
+			return 'MAIN'
+		end
+
+        -- set payer to the created user ID.
+        local r = assert(db:fetchone(
+		"SELECT id FROM users WHERE keyhash = ?", hash))
+		local ok, err = db:fetchone(
+			"UPDATE users SET sponsor = ? WHERE id = ?", r[1], r[1])
+		if not ok then
+			print(" Error setting sponsor: %s", err)
+			return 'MAIN'
+		end
+
+		return keylogin(hash)
+
+		end,
+	},
 }
 
 PROD_CODE = {
@@ -447,7 +517,8 @@ USER = {
 
 	keyboard = {
 		['/'] = function(id)
-			print " Swipe new card (or press enter to abort):"
+			print " Swipe new card or press four-digit pin"
+            print " (or press enter to abort):"
 			return 'SWITCH_CARD', id
 		end,
 		['.'] = function(id)
@@ -584,10 +655,27 @@ SWITCH_CARD = {
 
 	barcode = 'SWITCH_CARD',
 
-	keyboard = function(_, id)
-		print " Aborted."
-		return 'USER', id
-	end,
+	keyboard = {
+		[''] = function()
+			print " Aborted."
+			return 'USER', id
+		end,
+		function(hash, id) --default
+           print "Updating hash.."
+           if #hash ~= 4 then
+              print(" Not four-digit pin")
+              return 'USER', id
+           end
+           local ok, err = db:fetchone(
+              "UPDATE users SET keyhash = ? WHERE id = ?", hash, id)
+           if not ok then
+              print("Error updating hash: %s", err)
+           else
+              print("Done.")
+           end
+           return 'USER', id
+        end,
+    },
 }
 
 SWITCH_PAYER = {
@@ -843,7 +931,7 @@ local function run(...)
 	}
 
 	function handle_state(str, ...)
---       print(inspect{str,...})
+      -- print(inspect{str,...})
 		local state = _ENV[str]
 		if not state then
 			error(format("%s: invalid state", tostring(str)))

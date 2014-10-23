@@ -3,6 +3,7 @@ CREATE TABLE "users" (
     sponsor INTEGER NOT NULL DEFAULT (0),
 	name VARCHAR(60),
 	hash VARCHAR(40) UNIQUE,
+	keyhash VARCHAR(40) UNIQUE,
 	balance FLOAT,
     CONSTRAINT fk_id
     FOREIGN KEY (sponsor) REFERENCES users(id)
