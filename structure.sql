@@ -20,6 +20,11 @@ CREATE TABLE "log" (
 	amount FLOAT
 );
 
+-- coalesce:
+-- goes through all the parameters one by one, and returns the first that is NOT
+-- NULL.
+-- COALESCE(NULL, NULL, NULL, 1, 2, 3)
+-- => 1
 CREATE VIEW "full_log" AS SELECT
 		dt, uid, oid,
 		users.name AS uname,

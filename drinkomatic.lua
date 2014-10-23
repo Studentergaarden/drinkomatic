@@ -5,6 +5,8 @@ local io      = require 'lem.io'
 local sha1    = require 'sha1'
 local sqlite  = require 'lem.sqlite3'
 local bqueue  = require 'bqueue'
+local inspect = require 'inspect'
+
 
 local assert, error  = assert, error
 local type, tostring = type, tostring
@@ -722,10 +724,20 @@ local function run(...)
 	}
 
 	function handle_state(str, ...)
+       print(inspect{str,...})
 		local state = _ENV[str]
 		if not state then
 			error(format("%s: invalid state", tostring(str)))
 		end
+
+        -- execute init function in states, if any. Eg:
+        -- init = function(name, hash)
+        --    print(inspect(name) .. inspect(hash))
+        -- end,
+        local init = state.init
+        if init then
+           init(...)
+        end
 
 		local cmd, err = input:get(state.wait)
 		if not cmd then
