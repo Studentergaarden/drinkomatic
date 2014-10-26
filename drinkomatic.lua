@@ -73,7 +73,7 @@ local function user_menu()
 	print "   Scan barcode to buy product."
 	print "   Press enter to log out."
 	print ""
-	print "  /  | Switch card."
+	print "  /  | Switch card/pincode."
 	print "  *  | Show my log."
 	print "  +  | Add money to account."
 	print "  -  | Transfer money."
@@ -522,7 +522,7 @@ USER = {
 			return 'SWITCH_CARD', id
 		end,
 		['.'] = function(id)
-			print " Swipe new card (or press enter to abort):"
+			print " Press enter to get list of users:"
 			return 'SWITCH_PAYER', id, 0
 		end,
 		['*'] = function(id, sid)

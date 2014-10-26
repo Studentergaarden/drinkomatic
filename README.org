@@ -6,6 +6,22 @@ Zebex Z-6070
 [[http://www.zebex.com/Product/documents/ProgrammingGuide_Omnidirectional.pdf][Programming guide]]
 [[http://www.zebex.com/Product/documents/Z-6070/Z-6070_UsersManual_100915.pdf][User manual]]
 
+** Install
+#+BEGIN_SRC sh
+sudo apt-get install lua5.2 git sqlite3 libsqlite3-dev pkg-config
+git clone https://github.com/Studentergaarden/drinkomatic.git
+git clone https://github.com/Studentergaarden/lua-sha1.git
+git clone https://github.com/esmil/lem.git
+git clone https://github.com/esmil/lem-sqlite3.git
+
+cd lem && ./configure && make
+sudo make install
+
+cd ../lem-sqlite3 && make && sudo make install
+
+cd ../lua-sha1 && make LUA_INCDIR=/usr/local/include/lem && sudo make install
+#+END_SRC
+
 ** Create database
 
 Install SQLite3
@@ -19,12 +35,33 @@ and create database
 sqlite3 /home/paw/tmp/micropay.db < structure.sql
 #+END_SRC 
 
+** Create alias for =/dev/ttyUSB0= 
+
+In order to give a persistent name to the specific serial-to-usb devices, we
+need a rule to udev. First find the serial number for the device (without grep a
+lot of info about the usb is shown - use the first value of each keyword):
+
+=$ udevadm info -a -n /dev/ttyUSB* | egrep -w --color 'idVendor|idProduct|serial'=
+
+Then add the rule
+
+#+BEGIN_SRC sh
+$ sudo nano /etc/udev/rules.d/99-usb-serial.rules
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0711", ATTRS{idProduct}=="0230", ATTRS{serial}=="026637", SYMLINK+="card"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", SYMLINK+="barcode"
+#+END_SRC
+
+and update udev
+
+=$ sudo udevadm trigger --action=change=
+
+src{SYMLINK+="vard"} means that UDEV should create a symlink =/dev/card= pointing to the actual =/dev/ttyUSB*= device. In other words the device names will continue to be assigned ad-hoc but the symbolic links will always point to the right device node.
+
+Note 
+
+
 ** Use RPi
 http://www.instructables.com/id/How-to-Make-a-Raspberry-Pi-Media-Panel-fka-Digita/
 
 See also [[http://www.instructables.com/id/How-to-Make-a-Raspberry-Pi-Media-Panel-fka-Digita/?comments%3Dall#CT2V250I12KJ7WY][this]] comment.
 * TODO
-** Login with number
-** Create child accounts
-Create users which are owned by a master.
-These accounts can buy, but the master is paying.
