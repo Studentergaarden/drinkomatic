@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+** About
+
+This is written in [[http://www.lua.org][lua]] using the [[https://github.com/esmil/lem][Lua Event Machine]], along with the [[https://github.com/esmil/lem-sqlite3][sqlite3]]
+library for it. [[https://github.com/Studentergaarden/lua-sha1][sha1]] is used for hashing the readings from the magnetic cards.
 
 ** Barcode scanner
 Zebex Z-6070
@@ -41,7 +45,9 @@ In order to give a persistent name to the specific serial-to-usb devices, we
 need a rule to udev. First find the serial number for the device (without grep a
 lot of info about the usb is shown - use the first value of each keyword):
 
-=$ udevadm info -a -n /dev/ttyUSB* | egrep -w --color 'idVendor|idProduct|serial'=
+#+BEGIN_SRC sh
+udevadm info -a -n /dev/ttyUSB* | egrep -w --color 'idVendor|idProduct|serial'
+#+END_SRC
 
 Then add the rule
 
@@ -55,10 +61,14 @@ and update udev
 
 =$ sudo udevadm trigger --action=change=
 
-src{SYMLINK+="vard"} means that UDEV should create a symlink =/dev/card= pointing to the actual =/dev/ttyUSB*= device. In other words the device names will continue to be assigned ad-hoc but the symbolic links will always point to the right device node.
+src{SYMLINK+="card"} means that UDEV should create a symlink =/dev/card= pointing to the actual =/dev/ttyUSB*= device. In other words the device names will continue to be assigned ad-hoc but the symbolic links will always point to the right device node.
 
-Note 
+** Using named pipes
 
+Instead of connecting an barcode scanner or cardreader, a named pipe can be used for testing:
+=mkfifo /home/paw/tmp/testpipe=
+
+Then change =./drinkomatic= to use this pipe instead of =/dev/ttyUSB*=.
 
 ** Use RPi
 http://www.instructables.com/id/How-to-Make-a-Raspberry-Pi-Media-Panel-fka-Digita/

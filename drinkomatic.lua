@@ -112,6 +112,10 @@ local function login(hash, id)
 	print("-------------------------------------------")
 	print(" Logged in as : %s", r[3])
 	print(" Balance      : %.2f DKK", r[4])
+	if r[1] ~= r[2] then
+		local name = assert(db:fetchone("SELECT name FROM users WHERE id = ?", r[2]))
+		print(" Paying for you : %s", name)
+	end
 	print("")
 	print(" NB. If your name is just numbers,")
 	print("     please tell Paw to change it.")
@@ -734,6 +738,7 @@ SWITCH_PAYER = {
 			print(" Setting %s as payer:", r[1])
 			local ok, err = db:fetchone(
 				"UPDATE users SET sponsor = ? WHERE id = ?", n, id)
+			sid = n
 			return 'USER', id, sid
 		end,
 	},
