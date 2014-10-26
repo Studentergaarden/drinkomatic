@@ -1,4 +1,6 @@
 #!/usr/bin/env lem
+-- -*- coding: utf-8 -*-
+
 
 local utils   = require 'lem.utils'
 local io      = require 'lem.io'
@@ -138,8 +140,12 @@ local function keylogin(hash, id)
 
 	clearscreen()
 	print("-------------------------------------------")
-	print(" Logged in as : %s", r[3])
-	print(" Balance      : %.2f DKK", r[4])
+	print(" Logged in as   : %s", r[3])
+	print(" Balance        : %.2f DKK", r[4])
+	if r[1] ~= r[2] then
+		local name = assert(db:fetchone("SELECT name FROM users WHERE id = ?", r[2]))
+		print(" Paying for you : %s", name)
+	end
 	print("")
 	print(" NB. If your name is just numbers,")
 	print("     please tell Paw to change it.")
@@ -487,7 +493,7 @@ USER = {
 
 		if r == true then
 			print " Unknown product.."
-			return 'USER', id
+			return 'USER', id, sid
 		end
 
 		local pid = r[1]
@@ -516,14 +522,14 @@ USER = {
 	end,
 
 	keyboard = {
-		['/'] = function(id)
+		['/'] = function(id, sid)
 			print " Swipe new card or press four-digit pin"
             print " (or press enter to abort):"
-			return 'SWITCH_CARD', id
+			return 'SWITCH_CARD', id, sid
 		end,
-		['.'] = function(id)
-			print " Press enter to get list of users:"
-			return 'SWITCH_PAYER', id, 0
+		['.'] = function(id, sid)
+			print " Enter user id (or press enter for user list):"
+			return 'SWITCH_PAYER', id, sid, 0
 		end,
 		['*'] = function(id, sid)
 			local r = assert(db:fetchall("\z
@@ -635,12 +641,12 @@ USER_LIST = {
 
 SWITCH_CARD = {
 	wait = timeout,
-	timeout = function(_, id)
+	timeout = function(_, id, sid)
 		print " Aborted due to inactivity."
-		return 'USER', id
+		return 'USER', id, sid
 	end,
 
-	card = function(hash, id)
+	card = function(hash, id, sid)
 		print "Updating hash.."
 		local ok, err = db:fetchone(
 			"UPDATE users SET hash = ? WHERE id = ?", hash, id)
@@ -650,7 +656,7 @@ SWITCH_CARD = {
 			print("Done.")
 		end
 
-		return 'USER', id
+		return 'USER', id, sid
 	end,
 
 	barcode = 'SWITCH_CARD',
@@ -658,13 +664,13 @@ SWITCH_CARD = {
 	keyboard = {
 		[''] = function()
 			print " Aborted."
-			return 'USER', id
+			return 'USER', id, sid
 		end,
-		function(hash, id) --default
+		function(hash, id, sid) --default
            print "Updating hash.."
            if #hash ~= 4 then
               print(" Not four-digit pin")
-              return 'USER', id
+              return 'USER', id, sid
            end
            local ok, err = db:fetchone(
               "UPDATE users SET keyhash = ? WHERE id = ?", hash, id)
@@ -673,16 +679,16 @@ SWITCH_CARD = {
            else
               print("Done.")
            end
-           return 'USER', id
+           return 'USER', id, sid
         end,
     },
 }
 
 SWITCH_PAYER = {
 	wait = timeout,
-	timeout = function(_, id)
+	timeout = function(_, id, sid)
 		print " Aborted due to inactivity."
-		return 'USER', id
+		return 'USER', id, sid
 	end,
 
 	card = login,
@@ -690,13 +696,13 @@ SWITCH_PAYER = {
 	barcode = 'SWITCH_PAYER',
 
 	keyboard = {
-		[''] = function(id, offset)
+		[''] = function(id, sid, offset)
 			local r = assert(db:fetchall(
 				"SELECT id, name FROM users ORDER BY id LIMIT 39 OFFSET ?", offset))
 			local n = #r
 			if n == 0 then
 				print " Aborted."
-				return 'USER', id
+				return 'USER', id, sid
 			end
 
 			for i = 1, n < 39 and n or 38 do
@@ -709,26 +715,26 @@ SWITCH_PAYER = {
 			else
 				print " Enter user id (or press enter to continue list):"
 			end
-			return 'SWITCH_PAYER', id, offset + 38
+			return 'SWITCH_PAYER', id, sid, offset + 38
 		end,
-		function(cmd, id) --default
+		function(cmd, id, sid) --default
 			local n = tonumber(cmd)
 			if not n then
 				print(" Unable to parse '%s', aborted.", cmd)
-				return 'USER', id
+				return 'USER', id, sid
 			end
 
 			local r = assert(db:fetchone(
 				"SELECT name FROM users WHERE id = ?", n))
 			if r == true then
 				print(" No such user. Aborted.")
-				return 'USER', id
+				return 'USER', id, sid
 			end
 
 			print(" Setting %s as payer:", r[1])
 			local ok, err = db:fetchone(
 				"UPDATE users SET sponsor = ? WHERE id = ?", n, id)
-			return 'USER', id
+			return 'USER', id, sid
 		end,
 	},
 }
