@@ -63,6 +63,19 @@ and update udev
 
 src{SYMLINK+="card"} means that UDEV should create a symlink =/dev/card= pointing to the actual =/dev/ttyUSB*= device. In other words the device names will continue to be assigned ad-hoc but the symbolic links will always point to the right device node.
 
+** Change comma to dot on keypad
+
+Run and add the following to =~/.xinitrc=
+
+#+BEGIN_SRC sh
+# change comma to dot on numeric keypad
+setxkbmap -option '' -option kpdl:dot
+#+END_SRC
+
+NB: This does only work in a graphical environment, eg. X must be started.
+
+To check the current settings, write =setxkbmap -query= 
+
 ** Using named pipes
 
 Instead of connecting an barcode scanner or cardreader, a named pipe can be used for testing:

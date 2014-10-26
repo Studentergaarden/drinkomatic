@@ -547,7 +547,8 @@ USER = {
 					CASE WHEN count NOT NULL THEN count \z
 						WHEN oid <> ?1 THEN 1 ELSE -1 END, \z
 					amount, \z
-					Case WHEN sid <> uid THEN ' - bought by ' || uname \z
+					Case WHEN sid <> uid and uid = ?1 THEN ' - payed by ' || sname \z
+						 WHEN sid <> uid and sid = ?1 THEN ' - bought by ' || uname \z
 						ELSE '' END \z
 				FROM full_log \z
 				WHERE uid = ?1 OR (sid = ?1) OR (count IS NULL AND oid = ?1) \z
