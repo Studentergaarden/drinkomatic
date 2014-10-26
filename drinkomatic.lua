@@ -114,7 +114,7 @@ local function login(hash, id)
 	print(" Balance      : %.2f DKK", r[4])
 	if r[1] ~= r[2] then
 		local name = assert(db:fetchone("SELECT name FROM users WHERE id = ?", r[2]))
-		print(" Paying for you : %s", name)
+		print(" Paying for you : %s", name[1])
 	end
 	print("")
 	print(" NB. If your name is just numbers,")
@@ -148,7 +148,7 @@ local function keylogin(hash, id)
 	print(" Balance        : %.2f DKK", r[4])
 	if r[1] ~= r[2] then
 		local name = assert(db:fetchone("SELECT name FROM users WHERE id = ?", r[2]))
-		print(" Paying for you : %s", name)
+		print(" Paying for you : %s", name[1])
 	end
 	print("")
 	print(" NB. If your name is just numbers,")
