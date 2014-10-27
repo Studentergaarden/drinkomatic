@@ -899,6 +899,7 @@ utils.spawn(function()
 	while true do
 		local line = assert(stdin:read('*l'))
 		input:put{ from = 'keyboard', data = line }
+		io.popen("xscreensaver-command -deactivate")
 	end
 end)
 
@@ -908,6 +909,7 @@ utils.spawn(function()
 	while true do
 		local line = assert(ins:read('*l', '\r'))
 		input:put{ from = 'card', data = ctx:add(line):add('\r'):hex() }
+		io.popen("xscreensaver-command -deactivate")
 	end
 end)
 
@@ -916,6 +918,7 @@ utils.spawn(function()
 	while true do
 		local line = assert(ins:read('*l', '\r'))
 		input:put{ from = 'barcode', data = line }
+		io.popen("xscreensaver-command -deactivate")
 	end
 end)
 
